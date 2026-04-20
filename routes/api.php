@@ -33,11 +33,14 @@ Route::middleware('auth:api')->group(function () {
         Route::get('students/{student}',       [StudentController::class, 'show']);
         Route::get('students/{student}/attendance', [AttendanceController::class, 'studentHistory']);
         Route::get('justifications',           [JustificationController::class, 'index']);
+        Route::patch('justifications/{justification}/status', [JustificationController::class, 'updateStatus']);
+        Route::get('analytics/summary', [AttendanceController::class, 'summary']);
     });
 
     // 🔒 ACCÈS RÉSERVÉ : ÉTUDIANT UNIQUEMENT (pour soumettre ses propres justifications)
     Route::middleware('role:student')->group(function () {
-        Route::post('students/{student}/justifications', [JustificationController::class, 'store']);
+        Route::get('my-profile', [StudentController::class, 'me']);
+        Route::post('my-justifications', [JustificationController::class, 'storeMe']);
     });
 
     // 🔒 ACCÈS RÉSERVÉ : ADMIN UNIQUEMENT
@@ -45,8 +48,6 @@ Route::middleware('auth:api')->group(function () {
         Route::post('students',              [StudentController::class, 'store']);
         Route::put('students/{student}',     [StudentController::class, 'update']);
         Route::delete('students/{student}',  [StudentController::class, 'destroy']);
-
-        Route::patch('justifications/{justification}/status', [JustificationController::class, 'updateStatus']);
 
         Route::get('config',    [ConfigController::class, 'show']);
         Route::put('config',    [ConfigController::class, 'update']);

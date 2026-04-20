@@ -104,19 +104,46 @@ class AttendanceController extends Controller
         ]);
     }
 
+    public function summary()
+    {
+        $today = Carbon::today()->toDateString();
+        
+        $totalStudents = Student::where('is_active', true)->count();
+        $presentToday  = Attendance::where('date', $today)->where('status', 'present')->count();
+        $lateToday     = Attendance::where('date', $today)->where('status', 'late')->count();
+        
+        // Total présents (inclus les retards)
+        $totalPresentToday = $presentToday + $lateToday;
+        
+        // Les absents sont ceux qui n'ont pas encore scanné aujourd'hui
+        $absentToday   = $totalStudents - $totalPresentToday;
+        $pendingJustif = \App\Models\Justification::where('status', 'pending')->count();
+
+        return response()->json([
+            'total_students' => $totalStudents,
+            'present_today'  => $presentToday,
+            'late_today'     => $lateToday,
+            'total_present'  => $totalPresentToday,
+            'absent_today'   => max(0, $absentToday),
+            'pending_justifications' => $pendingJustif,
+            'attendance_rate' => $totalStudents > 0 ? round(($totalPresentToday / $totalStudents) * 100, 1) : 0,
+        ]);
+    }
+
     private function computeStatus(Carbon $time): string
     {
-        // Read thresholds from config (minutes after session start, e.g. 08:00)
-        $lateAfter   = config('attendance.late_after_minutes', 10);
-        $absentAfter = config('attendance.absent_after_minutes', 30);
-        $sessionStart = Carbon::today()->setTimeFromTimeString(
-            config('attendance.session_start', '08:00:00')
-        );
-
+        $lateAfter   = (int) \Illuminate\Support\Facades\Cache::get('config.late_after_minutes', 10);
+        $absentAfter = (int) \Illuminate\Support\Facades\Cache::get('config.absent_after_minutes', 30);
+        $sessionStartStr = \Illuminate\Support\Facades\Cache::get('config.session_start', '08:00:00');
+        
+        $sessionStart = Carbon::today()->setTimeFromTimeString($sessionStartStr);
         $diff = $sessionStart->diffInMinutes($time, false);
 
-        if ($diff <= $lateAfter) return 'present';
+        // Si l'étudiant scanne AVANT l'heure ou dans les 5 premières minutes (grâce)
+        if ($diff <= 5) return 'present';
+        // Si l'étudiant scanne après la grâce mais avant le seuil d'absence
         if ($diff <= $absentAfter) return 'late';
+        // Au delà du seuil d'absence
         return 'absent';
     }
 }

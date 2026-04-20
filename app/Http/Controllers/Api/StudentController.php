@@ -13,6 +13,15 @@ class StudentController extends Controller
         return response()->json(Student::with(['attendances'])->get());
     }
 
+    public function me()
+    {
+        $user = auth('api')->user();
+        if (!$user->student) {
+            return response()->json(['message' => 'Student record not found'], 404);
+        }
+        return response()->json($user->student->load('attendances', 'justifications'));
+    }
+
     // Admin: register a new student
     public function store(Request $request)
     {

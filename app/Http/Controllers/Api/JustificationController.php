@@ -8,6 +8,36 @@ use Illuminate\Http\Request;
 
 class JustificationController extends Controller
 {
+    // Student submits a justification for themselves
+    public function storeMe(Request $request)
+    {
+        $user = auth('api')->user();
+        if (!$user->student) {
+            return response()->json(['message' => 'Student record not found'], 404);
+        }
+
+        $request->validate([
+            'message'  => 'required|string',
+            'file'     => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:2048',
+        ]);
+
+        $filePath = null;
+        if ($request->hasFile('file')) {
+            $filePath = $request->file('file')->store('justifications', 'public');
+        }
+
+        $justification = Justification::create([
+            'student_id'    => $user->student->id,
+            'attendance_id' => $request->absence_id,
+            'type'          => 'justification',
+            'message'       => $request->message,
+            'file_path'     => $filePath,
+            'status'        => 'pending',
+        ]);
+
+        return response()->json($justification, 201);
+    }
+
     // Student submits a justification
     public function store(Request $request, Student $student)
     {

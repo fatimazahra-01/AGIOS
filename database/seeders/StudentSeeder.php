@@ -17,8 +17,15 @@ class StudentSeeder extends Seeder
             ['name' => 'Omar Tahiri',      'class' => '3IIR-A', 'card_id' => 'CARD005', 'fingerprint_id' => 5],
         ];
 
-        foreach ($students as $student) {
-            Student::create(array_merge($student, ['is_active' => true]));
+        foreach ($students as $studentData) {
+            $s = Student::create(array_merge($studentData, ['is_active' => true]));
+            
+            // Link to user if name matches
+            $user = \App\Models\User::where('name', $s->name)->first();
+            if ($user) {
+                $s->user_id = $user->id;
+                $s->save();
+            }
         }
     }
 }

@@ -8,8 +8,11 @@ use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
+
+
     public function run(): void
     {
+        User::truncate();
         User::create([
             'name'     => 'Admin User',
             'email'    => 'admin@ensam-casa.ma',
@@ -24,7 +27,7 @@ class UserSeeder extends Seeder
             'role'     => 'professor',
         ]);
         User::create([
-            'name' => 'Faty',
+            'name' => 'Youssef Alami',
             'email' => 'student@ensam-casa.ma',
             'password' => Hash::make('password'),
             'role' => 'student',

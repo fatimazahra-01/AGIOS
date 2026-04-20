@@ -40,12 +40,25 @@ class User extends Authenticatable implements JWTSubject
     public function getStatusAttribute()
     {
         $abs = $this->absences;
-        if ($abs >= 5) return 'Critique';
-        if ($abs >= 3)  return 'Avertissement';
+        $seuilWarn = (int) \Illuminate\Support\Facades\Cache::get('config.seuil_warn', 3);
+        $seuilCrit = (int) \Illuminate\Support\Facades\Cache::get('config.seuil_crit', 5);
+        
+        if ($abs >= $seuilCrit) return 'Critique';
+        if ($abs >= $seuilWarn) return 'Avertissement';
         return 'Actif';
     }
     public function isStudent(): bool
     {
         return $this->role === 'student';
+    }
+
+    public function student()
+    {
+        return $this->hasOne(Student::class);
+    }
+
+    public function attendances()
+    {
+        return $this->hasManyThrough(Attendance::class, Student::class);
     }
 }

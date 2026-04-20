@@ -377,91 +377,10 @@ body{font-family:var(--ff-body);background:var(--bg);color:var(--txt);font-size:
 </head>
 <body>
 <div id="root"></div>
-@verbatim
 <script type="text/babel">
-const API_BASE = `${window.location.origin}/api`;
-const CLASS_OPTIONS = ['3IIR-A', '3IIR-B', '2IIR-A', '2IIR-B', '1IIR-A', '1IIR-B'];
-const STATUS_LABELS = {
-  pending: 'En attente',
-  approved: 'Valide',
-  rejected: 'Refuse',
-  present: 'Present',
-  absent: 'Absent',
-  late: 'Retard',
-};
-const STATUS_BADGES = {
-  pending: 'ba',
-  approved: 'bg',
-  rejected: 'br',
-  present: 'bg',
-  absent: 'br',
-  late: 'bc',
-};
-
-const getStoredUser = () => {
-  try {
-    return JSON.parse(localStorage.getItem('sng_user'));
-  } catch (_) {
-    return null;
-  }
-};
-
-const clearStoredSession = () => {
-  localStorage.removeItem('sng_token');
-  localStorage.removeItem('sng_user');
-};
-
-const storeSession = user => {
-  localStorage.setItem('sng_token', user.token);
-  localStorage.setItem('sng_user', JSON.stringify(user));
-};
-
-const firstValidationError = err => {
-  const groups = err?.response?.data?.errors;
-  if (!groups) return null;
-  const firstGroup = Object.values(groups)[0];
-  return Array.isArray(firstGroup) ? firstGroup[0] : null;
-};
-
-const formatApiError = err =>
-  firstValidationError(err) ||
-  err?.response?.data?.message ||
-  'Une erreur est survenue.';
-
-const summarizeStudent = student => {
-  const attendances = Array.isArray(student.attendances) ? student.attendances : [];
-  // On utilise les valeurs calculées par le backend (via $appends dans le modèle Student)
-  const absences = student.absences !== undefined ? student.absences : attendances.filter(a => a.status === 'absent').length;
-  const status = student.status || (absences >= 5 ? 'Critique' : absences >= 3 ? 'Avertissement' : 'Actif');
-
-  return {
-    ...student,
-    attendances,
-    absences,
-    status,
-  };
-};
-
-const normalizeJustification = item => ({
-  ...item,
-  file_name: item.file_path ? item.file_path.split('/').pop() : 'Aucun fichier',
-  preview_url: item.file_path ? `${window.location.origin}/storage/${item.file_path}` : null,
-});
-
-const formatDateTime = value => {
-  if (!value) return 'Date indisponible';
-  return new Date(value).toLocaleString('fr-FR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+const API_BASE = 'http://localhost:8000/api';
 
 axios.defaults.baseURL = API_BASE;
-axios.defaults.timeout = 10000;
-axios.defaults.headers.common.Accept = 'application/json';
 
 axios.interceptors.request.use(config => {
   const token = localStorage.getItem('sng_token');
@@ -472,17 +391,45 @@ axios.interceptors.request.use(config => {
 axios.interceptors.response.use(
   res => res,
   err => {
-    const isLoginRequest = String(err?.config?.url || '').includes('/auth/login');
-    if (err.response?.status === 401 && !isLoginRequest) {
-      clearStoredSession();
+    if (err.response?.status === 401) {
+      localStorage.removeItem('sng_token');
+      localStorage.removeItem('sng_user');
       window.location.reload();
     }
     return Promise.reject(err);
   }
-);
+);  
+const{useState,useEffect,useRef,useCallback}=React;
+const api=axios.create({baseURL:'/api',timeout:10000});
+api.interceptors.request.use(cfg=>{const t=localStorage.getItem('sng_token');if(t)cfg.headers.Authorization=`Bearer ${t}`;return cfg;});
+api.interceptors.response.use(r=>r,err=>{if(err.response?.status===401){localStorage.removeItem('sng_token');localStorage.removeItem('sng_user');}return Promise.reject(err);});
 
-const{useState,useEffect,useRef}=React;
-
+const STUDENTS=[
+  {id:1,name:'Ayoub Mansouri',email:'ayoub@ensam-casa.ma',filiere:'3IIR-A',absences:5,status:'Actif',justifies:2},
+  {id:2,name:'Sara El Amrani',email:'sara@ensam-casa.ma',filiere:'3IIR-A',absences:2,status:'Actif',justifies:2},
+  {id:3,name:'Khalid Benhaddou',email:'khalid@ensam-casa.ma',filiere:'3IIR-B',absences:8,status:'Avertissement',justifies:1},
+  {id:4,name:'Nadia Tahiri',email:'nadia@ensam-casa.ma',filiere:'2IIR-A',absences:0,status:'Actif',justifies:0},
+  {id:5,name:'Omar Benali',email:'omar@ensam-casa.ma',filiere:'3IIR-B',absences:3,status:'Actif',justifies:3},
+  {id:6,name:'Leila Chakir',email:'leila@ensam-casa.ma',filiere:'2IIR-B',absences:12,status:'Critique',justifies:0},
+];
+const ABSENCES_STU=[
+  {id:1,date:'2024-11-04',matiere:'Algorithmique',prof:'Dr. Benali',duree:'2h',justifie:true,statut:'Validé'},
+  {id:2,date:'2024-11-07',matiere:'Base de données',prof:'Dr. Saidi',duree:'1h30',justifie:false,statut:'Non justifié'},
+  {id:3,date:'2024-11-12',matiere:'Réseaux',prof:'Dr. Chraibi',duree:'2h',justifie:true,statut:'En attente'},
+  {id:4,date:'2024-11-15',matiere:'Mathématiques',prof:'Dr. Ouzine',duree:'3h',justifie:false,statut:'Non justifié'},
+];
+const MOCK_SCANS_INIT=[
+  {id:1,student:'Ayoub Mansouri',time:'08:02',status:'present',filiere:'3IIR-A'},
+  {id:2,student:'Sara El Amrani',time:'08:04',status:'present',filiere:'3IIR-A'},
+  {id:3,student:'Khalid Benhaddou',time:'08:07',status:'present',filiere:'3IIR-A'},
+  {id:4,student:'Nadia Tahiri',time:'08:09',status:'absent',filiere:'3IIR-A'},
+  {id:5,student:'Omar Benali',time:'08:11',status:'present',filiere:'3IIR-A'},
+];
+const JUSTIFS=[
+  {id:1,student:'Khalid Benhaddou',date:'2024-11-07',motif:'Maladie (grippe)',fichier:'certificat_medical.pdf',statut:'En attente',emoji:'📄'},
+  {id:2,student:'Omar Benali',date:'2024-11-12',motif:'Problème familial',fichier:'attestation.jpg',statut:'Validé',emoji:'🖼️'},
+  {id:3,student:'Ayoub Mansouri',date:'2024-11-15',motif:'Rendez-vous médical',fichier:'ordonnance.pdf',statut:'En attente',emoji:'📄'},
+];
 const AI_RESP={
   'absence':'Sur les **6 étudiants** suivis, **2 dépassent le seuil de 5 absences** : Khalid Benhaddou (8) et Leila Chakir (12 — statut critique ⚠️).',
   'présence':'Le taux de présence moyen de **3IIR-A** est de **87%** cette semaine. Ayoub Mansouri et Sara El Amrani maintiennent 95%+.',
@@ -493,11 +440,11 @@ const AI_RESP={
 const fakeLogin = async (email, password) => {
   const res = await axios.post('/auth/login', { email, password });
   const data = res.data;
+  // data = { access_token, token_type, expires_in, user }
   return {
     token: data.access_token,
     role: data.user.role,
     name: data.user.name,
-    email: data.user.email,
     id: data.user.id,
   };
 };
@@ -529,8 +476,7 @@ const I=({n,s=16})=>{
 
 const Av=({name,role,size=32})=>{
   const cls=role==='admin'?'av-a':role==='professor'?'av-p':'av-s';
-  const safeName=(name||'?').trim()||'?';
-  const init=safeName.split(/\s+/).map(n=>n[0]).join('').slice(0,2).toUpperCase();
+  const init=name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
   return<div className={`av ${cls}`} style={{width:size,height:size,minWidth:size,fontSize:size*0.35}}>{init}</div>;
 };
 
@@ -545,9 +491,10 @@ function LoginPage({onLogin}){
     setLoading(true);setErr('');
     try{
       const user=await fakeLogin(e,pass);
-      storeSession(user);
+      localStorage.setItem('sng_token',user.token);
+      localStorage.setItem('sng_user',JSON.stringify(user));
       onLogin(user);
-    }catch(er){setErr(formatApiError(er));}
+    }catch(er){setErr(er.message);}
     finally{setLoading(false);}
   };
   return(
@@ -570,7 +517,7 @@ function LoginPage({onLogin}){
         <button className="btn l-btn" onClick={()=>submit()} disabled={loading}>
           {loading?'⟳  Authentification...':'→  Se connecter'}
         </button>
-        <div className="l-hint">Comptes démo :<span>admin@ensam-casa.ma · prof@ensam-casa.ma · student@ensam-casa.ma</span>| mdp : password</div>
+        <div className="l-hint">Comptes démo :<span>admin@ensam-casa.ma · prof@ensam-casa.ma · etudiant@ensam-casa.ma</span>| mdp : 1234</div>
       </div>
     </div>
   );
@@ -581,14 +528,14 @@ function Sidebar({user,page,setPage,onLogout,mini,setMini}){
     {id:'dashboard',lbl:'Tableau de bord',ic:'home'},
     {id:'students',lbl:'Étudiants',ic:'users'},
     {id:'absences-admin',lbl:'Absences',ic:'cal'},
-    {id:'justificatifs-admin',lbl:'Justificatifs',ic:'file'},
+    {id:'justificatifs-admin',lbl:'Justificatifs',ic:'file',bdg:JUSTIFS.filter(j=>j.statut==='En attente').length},
     {id:'config',lbl:'Configuration',ic:'cfg'},
   ];
   const navProf=[
     {id:'dashboard',lbl:'Tableau de bord',ic:'home'},
     {id:'scan-live',lbl:'Scan en direct',ic:'scan'},
     {id:'students-prof',lbl:'Étudiants',ic:'users'},
-    {id:'justificatifs-prof',lbl:'Justificatifs',ic:'file'},
+    {id:'justificatifs-prof',lbl:'Justificatifs',ic:'file',bdg:JUSTIFS.filter(j=>j.statut==='En attente').length},
     {id:'chatbot',lbl:'Chatbot IA',ic:'bot'},
   ];
   const navStu=[
@@ -691,34 +638,27 @@ function Chatbot(){
     </>
   );
 }
+axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem('token')}`;
 function AdminDash(){
   const cRef=useRef(null);
-  const [stats, setStats] = useState({ total_students:0, present_today:0, late_today:0, absent_today:0, pending_justifications:0, attendance_rate: 0 });
+  const [stats, setStats] = useState({ total_students:0, present_today:0, late_today:0, absent_today:0 });
   const [watching, setWatching] = useState([]);
 
   useEffect(() => {
-    Promise.all([
-      axios.get('/students'),
-      axios.get('/analytics/summary'),
-    ])
-      .then(([studentsRes, summaryRes]) => {
-        const students = studentsRes.data.map(summarizeStudent);
-        const summary = summaryRes.data;
-
-        setStats({
-          total_students: summary.total_students,
-          present_today: summary.present_today,
-          late_today: summary.late_today,
-          absent_today: summary.absent_today,
-          pending_justifications: summary.pending_justifications,
-          attendance_rate: summary.attendance_rate,
-        });
-
-        setWatching(
-          students
-            .filter(student => student.status !== 'Actif')
-            .sort((a, b) => b.absences - a.absences)
-        );
+    // Charger les stats
+    axios.get('/analytics/summary')
+      .then(r => setStats(r.data))
+      .catch(() => {});
+    // Charger les étudiants
+    axios.get('/students')
+      .then(r => {
+        const list = r.data;
+        // Calculer les absences depuis les attendances
+        const withAbsences = list.map(s => ({
+          ...s,
+          absences: s.attendances ? s.attendances.filter(a => a.status === 'absent').length : 0,
+        }));
+        setWatching(withAbsences.filter(s => s.absences > 3));
       })
       .catch(() => {});
   }, []);
@@ -729,37 +669,37 @@ function AdminDash(){
     const inst=new Chart(ctx,{
       type:'bar',
       data:{
-        labels:['Présents','Retards','Absents','Justificatifs'],
+        labels:['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5','Sem 6'],
         datasets:[
-          {label:'Aujourd\'hui',data:[stats.present_today,stats.late_today,stats.absent_today,stats.pending_justifications],backgroundColor:['rgba(5,150,105,0.3)','rgba(8,145,178,0.3)','rgba(220,38,38,0.3)','rgba(217,119,6,0.3)'],borderColor:['rgba(5,150,105,0.7)','rgba(8,145,178,0.7)','rgba(220,38,38,0.7)','rgba(217,119,6,0.7)'],borderWidth:1,borderRadius:6},
+          {label:'Absences',data:[12,8,15,9,18,6],backgroundColor:'rgba(220,38,38,0.3)',borderColor:'rgba(220,38,38,0.7)',borderWidth:1,borderRadius:6},
+          {label:'Présences',data:[88,92,85,91,82,94],backgroundColor:'rgba(5,150,105,0.3)',borderColor:'rgba(5,150,105,0.7)',borderWidth:1,borderRadius:6},
         ]
       },
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(100,116,139,0.8)',font:{size:11,family:'JetBrains Mono'}}}},scales:{x:{grid:{color:'rgba(15,23,42,0.04)'},ticks:{color:'rgba(100,116,139,0.7)',font:{size:10}}},y:{grid:{color:'rgba(15,23,42,0.04)'},ticks:{color:'rgba(100,116,139,0.7)',font:{size:10}}}}}
     });
     return()=>inst.destroy();
-  },[stats]);
+  },[]);
   return(
     <div className="pg-anim">
       <div className="sg">
         <div className="sc c"><div className="sc-top"></div><div className="sc-val">{stats.total_students}</div><div className="sc-lbl">Étudiants inscrits</div></div>
-        <div className="sc g"><div className="sc-top"></div><div className="sc-val">{stats.attendance_rate}<span style={{fontSize:16}}>%</span></div><div className="sc-lbl">Taux de présence</div></div>
+        <div className="sc g"><div className="sc-top"></div><div className="sc-val">{(stats.total_students > 0 ? (stats.present_today / stats.total_students * 100).toFixed(1) : 0)}<span style={{fontSize:16}}>%</span></div><div className="sc-lbl">Taux de présence</div></div>
         <div className="sc a"><div className="sc-top"></div><div className="sc-val">{stats.absent_today}</div><div className="sc-lbl">Absences ce jour</div></div>
-        <div className="sc r"><div className="sc-top"></div><div className="sc-val">{stats.pending_justifications}</div><div className="sc-lbl">Justificatifs en attente</div></div>
+        <div className="sc r"><div className="sc-top"></div><div className="sc-val">9</div><div className="sc-lbl">Justificatifs en attente</div></div>
       </div>
       <div className="card" style={{marginBottom:18}}>
-        <div className="sh"><div className="st">Synthèse temps réel</div><span className="chip">API Laravel</span></div>
+        <div className="sh"><div className="st">Évolution présences / absences</div><span className="chip">Nov. 2024</span></div>
         <div className="ch"><canvas ref={cRef}/></div>
       </div>
       <div className="card">
-        <div className="sh"><div className="st">Étudiants à surveiller</div><span className="bdg br">{watching.length} suivi(s)</span></div>
-        {watching.length>0?(
+        <div className="sh"><div className="st">Étudiants à surveiller</div><span className="bdg br">3 critiques</span></div>
         <table className="dt">
           <thead><tr><th>Étudiant</th><th>Filière</th><th>Absences</th><th>Statut</th><th>Seuil</th></tr></thead>
           <tbody>
-            {watching.map(s=>(
+            {STUDENTS.filter(s=>s.absences>3).map(s=>(
               <tr key={s.id}>
                 <td><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} role="student" size={28}/><span style={{fontWeight:600}}>{s.name}</span></div></td>
-                <td><span className="chip">{s.class}</span></td>
+                <td><span className="chip">{s.filiere}</span></td>
                 <td><strong style={{color:s.absences>7?'var(--red)':s.absences>4?'var(--amber)':'var(--txt)',fontFamily:'var(--ff-mono)'}}>{s.absences}</strong></td>
                 <td><span className={`bdg ${s.status==='Critique'?'br':s.status==='Avertissement'?'ba':'bg'}`}>{s.status}</span></td>
                 <td style={{minWidth:100}}><div className="pb"><div className="pf" style={{width:`${Math.min(s.absences*8,100)}%`,background:s.absences>7?'var(--red)':s.absences>4?'var(--amber)':'var(--green)'}}/></div></td>
@@ -767,7 +707,6 @@ function AdminDash(){
             ))}
           </tbody>
         </table>
-        ):<div className="empty"><div className="ei">✓</div><div className="et">Aucun étudiant au-dessus du seuil de surveillance</div></div>}
       </div>
     </div>
   );
@@ -775,57 +714,44 @@ function AdminDash(){
 
 
 function StudentsPage(){
-  const emptyForm = {name:'',class:'3IIR-A',card_id:'',fingerprint_id:''};
   const [list, setList] = useState([]);
   const [q, setQ] = useState('');
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({name:'',class:'3IIR-A',card_id:'',fingerprint_id:''});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    axios.get('/students').then(r => setList(r.data.map(summarizeStudent))).catch(() => {});
+    axios.get('/students').then(r => setList(r.data)).catch(() => {});
   }, []);
 
   const filtered = list.filter(s =>
     s.name.toLowerCase().includes(q.toLowerCase()) || s.class?.includes(q)
   );
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setModal(true); };
+  const openNew = () => { setEditing(null); setForm({name:'',class:'3IIR-A',card_id:'',fingerprint_id:''}); setModal(true); };
   const openEdit = s => { setEditing(s); setForm({name:s.name,class:s.class,card_id:s.card_id,fingerprint_id:s.fingerprint_id||''}); setModal(true); };
 
   const save = async () => {
     setLoading(true);
     try {
-      const payload = {
-        name: form.name.trim(),
-        class: form.class,
-        card_id: form.card_id.trim(),
-        fingerprint_id: form.fingerprint_id === '' ? null : parseInt(form.fingerprint_id, 10),
-      };
-
       if (editing) {
-        const r = await axios.put(`/students/${editing.id}`, payload);
-        setList(p => p.map(s => s.id === editing.id ? summarizeStudent(r.data) : s));
+        const r = await axios.put(`/students/${editing.id}`, form);
+        setList(p => p.map(s => s.id === editing.id ? r.data : s));
       } else {
-        const r = await axios.post('/students', payload);
-        setList(p => [...p, summarizeStudent(r.data)]);
+        const r = await axios.post('/students', form);
+        setList(p => [...p, r.data]);
       }
       setModal(false);
-      setForm(emptyForm);
     } catch(e) {
-      alert(formatApiError(e));
+      alert(e.response?.data?.message || 'Erreur');
     } finally { setLoading(false); }
   };
 
   const del = async id => {
     if (!confirm('Supprimer cet étudiant ?')) return;
-    try{
-      await axios.delete(`/students/${id}`);
-      setList(p => p.filter(s => s.id !== id));
-    }catch(e){
-      alert(formatApiError(e));
-    }
+    await axios.delete(`/students/${id}`);
+    setList(p => p.filter(s => s.id !== id));
   };
   return(
     <div className="pg-anim">
@@ -835,7 +761,7 @@ function StudentsPage(){
       </div>
       <div className="card">
         <table className="dt">
-          <thead><tr><th>Étudiant</th><th>Carte</th><th>Filière</th><th>Absences</th><th>Statut</th><th style={{textAlign:'right'}}>Actions</th></tr></thead>
+          <thead><tr><th>Étudiant</th><th>Email</th><th>Filière</th><th>Absences</th><th>Statut</th><th style={{textAlign:'right'}}>Actions</th></tr></thead>
           <tbody>
             {filtered.map(s=>(
               <tr key={s.id}>
@@ -862,10 +788,9 @@ function StudentsPage(){
             <div className="mo-title">{editing?'Modifier l\'étudiant':'Nouvel étudiant'}</div>
             <button className="mo-close" onClick={()=>setModal(false)}>×</button>
             <div className="fg"><label className="fl">Nom complet</label><input className="fi" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Prénom Nom"/></div>
-            <div className="fg"><label className="fl">Filière</label><select className="fsel" value={form.class} onChange={e=>setForm({...form,class:e.target.value})}>{CLASS_OPTIONS.map(f=><option key={f}>{f}</option>)}</select></div>
-            <div className="fg"><label className="fl">ID carte</label><input className="fi" value={form.card_id} onChange={e=>setForm({...form,card_id:e.target.value})} placeholder="CARD001"/></div>
-            <div className="fg"><label className="fl">ID empreinte</label><input className="fi" type="number" value={form.fingerprint_id} onChange={e=>setForm({...form,fingerprint_id:e.target.value})} placeholder="1"/></div>
-            <div className="mo-foot"><button className="btn b-ghost" onClick={()=>setModal(false)}>Annuler</button><button className="btn b-indigo" onClick={save} disabled={loading}><I n="chk" s={13}/>{loading?'Enregistrement...':editing?'Enregistrer':'Créer'}</button></div>
+            <div className="fg"><label className="fl">Email</label><input className="fi" type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="etudiant@emi.ac.ma"/></div>
+            <div className="fg"><label className="fl">Filière</label><select className="fsel" value={form.filiere} onChange={e=>setForm({...form,filiere:e.target.value})}>{['3IIR-A','3IIR-B','2IIR-A','2IIR-B','1IIR-A','1IIR-B'].map(f=><option key={f}>{f}</option>)}</select></div>
+            <div className="mo-foot"><button className="btn b-ghost" onClick={()=>setModal(false)}>Annuler</button><button className="btn b-indigo" onClick={save}><I n="chk" s={13}/>{editing?'Enregistrer':'Créer'}</button></div>
           </div>
         </div>
       )}
@@ -879,54 +804,48 @@ function JustificatifsAdmin(){
 
   useEffect(() => {
     axios.get('/justifications')
-      .then(r => setList((r.data || []).map(normalizeJustification)))
+      .then(r => setList(r.data))
       .catch(() => {});
   }, []);
 
   const validate = async (id, ok) => {
-    try{
-      const response = await axios.patch(`/justifications/${id}/status`, {
-        status: ok ? 'approved' : 'rejected'
-      });
-      setList(p => p.map(j => j.id === id
-        ? normalizeJustification(response.data.justification || {...j, status: ok ? 'approved' : 'rejected'})
-        : j
-      ));
-    }catch(e){
-      alert(formatApiError(e));
-    }
-  };
+    await axios.patch(`/justifications/${id}/status`, {
+      status: ok ? 'approved' : 'rejected'
+    });
+    setList(p => p.map(j => j.id === id
+      ? {...j, status: ok ? 'approved' : 'rejected'}
+      : j
+    ));  };
   return(
     <div className="pg-anim" style={{display:'flex',flexDirection:'column',gap:14}}>
-      {list.length===0&&<div className="empty"><div className="ei">📂</div><div className="et">Aucun justificatif disponible</div></div>}
       {list.map(j=>(
         <div key={j.id} className="jcard">
           <div className="jcard-hd">
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <Av name={j.student?.name} role="student" size={32}/>
-              <div><div style={{fontWeight:600,fontSize:13.5,color:'var(--txt)'}}>{j.student?.name || 'Étudiant inconnu'}</div><div style={{fontFamily:'var(--ff-mono)',color:'var(--txt4)',fontSize:10,marginTop:2}}>{formatDateTime(j.created_at)} · {j.message}</div></div>
+              <div><div style={{fontWeight:600,fontSize:13.5,color:'var(--txt)'}}>{j.student?.name}</div><div style={{fontFamily:'var(--ff-mono)',color:'var(--txt4)',fontSize:10,marginTop:2}}>{j.date} · {j.motif}</div></div>
             </div>
-            <span className={`bdg ${STATUS_BADGES[j.status] || 'ba'}`}>{STATUS_LABELS[j.status] || j.status}</span>
+            <span className={`bdg ${j.statut==='approved'?'bg':j.status==='rejected'?'br':'ba'}`}>{j.status}</span>
           </div>
           <div className="jcard-bd">
             <div className="jprev" onClick={()=>setPrev(j)}>
-              <div style={{textAlign:'center'}}><div style={{fontSize:32,marginBottom:6}}>{j.preview_url?'📄':'📝'}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:11,color:'var(--txt3)'}}>{j.file_name}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:9,color:'var(--indigo)',marginTop:4,letterSpacing:'0.05em'}}>CLIQUER POUR PRÉVISUALISER</div></div>
+              <div style={{textAlign:'center'}}><div style={{fontSize:32,marginBottom:6}}>{j.emoji}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:11,color:'var(--txt3)'}}>{j.fichier}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:9,color:'var(--indigo)',marginTop:4,letterSpacing:'0.05em'}}>CLIQUER POUR PRÉVISUALISER</div></div>
             </div>
-            {j.status==='pending'&&<div style={{display:'flex',gap:8}}><button className="btn b-cyan" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,true)}><I n="chk" s={13}/>Valider</button><button className="btn b-danger" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,false)}><I n="x" s={13}/>Refuser</button></div>}
+            {j.statut==='pending'&&<div style={{display:'flex',gap:8}}><button className="btn b-cyan" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,true)}><I n="chk" s={13}/>Valider</button><button className="btn b-danger" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,false)}><I n="x" s={13}/>Refuser</button></div>}
           </div>
         </div>
       ))}
       {prev&&(
         <div className="mo" onClick={()=>setPrev(null)}>
           <div className="mo-box" style={{maxWidth:460}}>
-            <div className="mo-title">Prévisualisation — {prev.file_name}</div>
+            <div className="mo-title">Prévisualisation — {prev.fichier}</div>
             <button className="mo-close" onClick={()=>setPrev(null)}>×</button>
             <div style={{background:'var(--bg3)',borderRadius:12,padding:36,textAlign:'center',marginBottom:14,border:'1px solid var(--border4)'}}>
-              <div style={{fontSize:60,marginBottom:10}}>{prev.preview_url?'📄':'📝'}</div>
-              <div style={{fontFamily:'var(--ff-mono)',fontSize:12,color:'var(--txt2)',marginBottom:4}}>{prev.file_name}</div>
-              <div style={{fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--txt3)'}}>Message : {prev.message} · {prev.student?.name || 'Étudiant inconnu'} · {formatDateTime(prev.created_at)}</div>
+              <div style={{fontSize:60,marginBottom:10}}>{prev.emoji}</div>
+              <div style={{fontFamily:'var(--ff-mono)',fontSize:12,color:'var(--txt2)',marginBottom:4}}>{prev.fichier}</div>
+              <div style={{fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--txt3)'}}>Motif : {prev.motif} · {prev.student} · {prev.date}</div>
             </div>
-            {prev.preview_url?<a className="btn b-indigo" href={prev.preview_url} target="_blank" rel="noreferrer">Ouvrir le fichier</a>:<div style={{background:'var(--amber2)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:9,padding:'9px 13px',fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--amber)',letterSpacing:'0.04em'}}>Aucun fichier joint pour ce justificatif</div>}
+            <div style={{background:'var(--amber2)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:9,padding:'9px 13px',fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--amber)',letterSpacing:'0.04em'}}>⚠ Aperçu simulé — fichier réel servi par Laravel Storage</div>
           </div>
         </div>
       )}
@@ -935,7 +854,7 @@ function JustificatifsAdmin(){
 }
 
 function ConfigPage(){
-  const [cfg, setCfg] = useState({debut:'08:00',retard:10,absence:20,seuil_warn:3,seuil_crit:5,notif:true,email:false});
+  const [cfg, setCfg] = useState({debut:'08:00',retard:10,absence:20});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -945,10 +864,6 @@ function ConfigPage(){
         debut: d.session_start?.slice(0,5) || '08:00',
         retard: d.late_after_minutes || 10,
         absence: d.absent_after_minutes || 20,
-        seuil_warn: d.seuil_warn || 3,
-        seuil_crit: d.seuil_crit || 5,
-        notif: d.hasOwnProperty('notif') ? d.notif : true,
-        email: d.hasOwnProperty('email') ? d.email : false,
       });
     }).catch(() => {});
   }, []);
@@ -958,10 +873,6 @@ function ConfigPage(){
       session_start: cfg.debut + ':00',
       late_after_minutes: parseInt(cfg.retard),
       absent_after_minutes: parseInt(cfg.absence),
-      seuil_warn: parseInt(cfg.seuil_warn),
-      seuil_crit: parseInt(cfg.seuil_crit),
-      notif: !!cfg.notif,
-      email: !!cfg.email,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -1023,8 +934,7 @@ function ConfigPage(){
           ))}
         </div>
       </div>
-      <div style={{display:'flex',justifyContent:'flex-end',marginTop:20,alignItems:'center',gap:12}}>
-        {saved && <span style={{color:'var(--green)',fontFamily:'var(--ff-mono)',fontSize:11}}>✓ Configuration enregistrée</span>}
+      <div style={{display:'flex',justifyContent:'flex-end',marginTop:20}}>
         <button className="btn b-indigo" style={{padding:'11px 28px'}} onClick={save}><I n="chk" s={14}/>Sauvegarder la configuration</button>
       </div>
     </div>
@@ -1032,12 +942,8 @@ function ConfigPage(){
 }
 
 function StudentsProfPage(){
-  const[list,setList]=useState([]);
   const[q,setQ]=useState('');
-  useEffect(()=>{
-    axios.get('/students').then(r=>setList(r.data.map(summarizeStudent))).catch(()=>{});
-  },[]);
-  const filtered=list.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())||s.class.includes(q));
+  const filtered=STUDENTS.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())||s.filiere.includes(q));
   return(
     <div className="pg-anim">
       <div className="topbar">
@@ -1045,13 +951,13 @@ function StudentsProfPage(){
       </div>
       <div className="card">
         <table className="dt">
-          <thead><tr><th>Étudiant</th><th>Carte</th><th>Filière</th><th>Absences</th><th>Statut</th></tr></thead>
+          <thead><tr><th>Étudiant</th><th>Email</th><th>Filière</th><th>Absences</th><th>Statut</th></tr></thead>
           <tbody>
             {filtered.map(s=>(
               <tr key={s.id}>
                 <td><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} role="student" size={30}/><span style={{fontWeight:600}}>{s.name}</span></div></td>
-                <td style={{fontFamily:'var(--ff-mono)',fontSize:12,color:'var(--txt3)'}}>{s.card_id}</td>
-                <td><span className="chip">{s.class}</span></td>
+                <td style={{fontFamily:'var(--ff-mono)',fontSize:12,color:'var(--txt3)'}}>{s.email}</td>
+                <td><span className="chip">{s.filiere}</span></td>
                 <td><span style={{fontFamily:'var(--ff-mono)',color:s.absences>7?'var(--red)':s.absences>3?'var(--amber)':'var(--green)',fontWeight:600}}>{s.absences}</span></td>
                 <td><span className={`bdg ${s.status==='Critique'?'br':s.status==='Avertissement'?'ba':'bg'}`}>{s.status}</span></td>
               </tr>
@@ -1066,25 +972,18 @@ function StudentsProfPage(){
 
 function ProfDash(){
   const lRef=useRef(null);const pRef=useRef(null);
-  const [stats, setStats] = useState({ total_students:0, present_today:0, absent_today:0, pending_justifications:0, attendance_rate: 0 });
-
-  useEffect(() => {
-    axios.get('/analytics/summary').then(r => setStats(r.data)).catch(() => {});
-  }, []);
-
   useEffect(()=>{
     if(!lRef.current||!pRef.current)return;
     const i1=new Chart(lRef.current.getContext('2d'),{type:'line',data:{labels:['Lun','Mar','Mer','Jeu','Ven','Sam'],datasets:[{label:'Présences',data:[28,31,27,33,29,25],borderColor:'rgba(8,145,178,0.9)',backgroundColor:'rgba(8,145,178,0.08)',tension:0.4,fill:true,pointBackgroundColor:'rgba(8,145,178,1)',pointRadius:4,pointBorderColor:'transparent'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(15,23,42,0.04)'},ticks:{color:'rgba(100,116,139,0.7)',font:{size:10}}},y:{grid:{color:'rgba(15,23,42,0.04)'},ticks:{color:'rgba(100,116,139,0.7)',font:{size:10}}}}}});
-    const i2=new Chart(pRef.current.getContext('2d'),{type:'doughnut',data:{labels:['Présents','Absents','En attente'],datasets:[{data:[stats.present_today, stats.absent_today, stats.pending_justifications],backgroundColor:['rgba(5,150,105,0.7)','rgba(220,38,38,0.7)','rgba(217,119,6,0.6)'],borderColor:['rgba(5,150,105,1)','rgba(220,38,38,1)','rgba(217,119,6,1)'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(100,116,139,0.8)',font:{size:10,family:'JetBrains Mono'}}}},cutout:'68%'}});
+    const i2=new Chart(pRef.current.getContext('2d'),{type:'doughnut',data:{labels:['Présents','Absents','Justifiés'],datasets:[{data:[74,18,8],backgroundColor:['rgba(5,150,105,0.7)','rgba(220,38,38,0.7)','rgba(217,119,6,0.6)'],borderColor:['rgba(5,150,105,1)','rgba(220,38,38,1)','rgba(217,119,6,1)'],borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'rgba(100,116,139,0.8)',font:{size:10,family:'JetBrains Mono'}}}},cutout:'68%'}});
     return()=>{i1.destroy();i2.destroy();};
-  }, [stats]);
+  },[]);
   return(
     <div className="pg-anim">
       <div className="sg">
-        <div className="sc g"><div className="sc-top"></div><div className="sc-val">{stats.attendance_rate}<span style={{fontSize:16}}>%</span></div><div className="sc-lbl">Présence globale</div></div>
-        <div className="sc c"><div className="sc-top"></div><div className="sc-val">{stats.present_today}</div><div className="sc-lbl">Scans aujourd'hui</div></div>
-        <div className="sc r"><div className="sc-top"></div><div className="sc-val">{stats.absent_today}</div><div className="sc-lbl">Absents ce jour</div></div>
-        <div className="sc a"><div className="sc-top"></div><div className="sc-val">{stats.pending_justifications}</div><div className="sc-lbl">Justifs en attente</div></div>
+        <div className="sc g"><div className="sc-top"></div><div className="sc-val">74<span style={{fontSize:16}}>%</span></div><div className="sc-lbl">Présence 3IIR-A</div></div>
+        <div className="sc c"><div className="sc-top"></div><div className="sc-val">32</div><div className="sc-lbl">Scans aujourd'hui</div></div>
+        <div className="sc r"><div className="sc-top"></div><div className="sc-val">6</div><div className="sc-lbl">Absences non justifiées</div></div>
       </div>
       <div className="g2" style={{marginBottom:18}}>
         <div className="card"><div className="sh"><div className="st">Présences hebdo</div></div><div className="ch" style={{height:200}}><canvas ref={lRef}/></div></div>
@@ -1096,7 +995,6 @@ function ProfDash(){
 
 function ScanLive(){
   const [scans, setScans] = useState([]);
-  const [live, setLive] = useState(true);
 
   const fetchRealtime = () => {
     axios.get('/attendance/realtime')
@@ -1105,11 +1003,10 @@ function ScanLive(){
   };
 
   useEffect(() => {
-    if(!live)return;
     fetchRealtime();
-    const interval = setInterval(fetchRealtime, 5000);
+    const interval = setInterval(fetchRealtime, 5000); // refresh toutes les 5s
     return () => clearInterval(interval);
-  }, [live]);
+  }, []);
   return(
     <div className="pg-anim">
       <div className="topbar">
@@ -1123,14 +1020,13 @@ function ScanLive(){
         <div className="sh"><div className="st">Flux des scans</div><span className="bdg bg">{scans.filter(s=>s.status==='present').length} présents</span></div>
         <div style={{display:'flex',flexDirection:'column',gap:7}}>
           {scans.map(s=>(
-            <div key={`${s.student}-${s.time}`} className="scan-it">
-              <div className="pulse-dot" style={{background:s.status==='present'?'var(--green)':s.status==='late'?'var(--cyan)':'var(--red)',boxShadow:`0 0 7px ${s.status==='present'?'rgba(5,150,105,0.5)':s.status==='late'?'rgba(8,145,178,0.5)':'rgba(220,38,38,0.5)'}`}}/>
+            <div key={s.id} className="scan-it">
+              <div className="pulse-dot" style={{background:s.status==='present'?'var(--green)':'var(--red)',boxShadow:`0 0 7px ${s.status==='present'?'rgba(5,150,105,0.5)':'rgba(220,38,38,0.5)'}`}}/>
               <Av name={s.student} role="student" size={30}/>
               <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13,color:'var(--txt)'}}>{s.student}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:9.5,color:'var(--txt4)',letterSpacing:'0.05em'}}>{s.class}</div></div>
-              <div style={{textAlign:'right'}}><div style={{fontFamily:'var(--ff-mono)',fontSize:11,color:'var(--txt3)'}}>{s.time}</div><span className={`bdg ${STATUS_BADGES[s.status] || 'ba'}`} style={{fontSize:9}}>{STATUS_LABELS[s.status] || s.status}</span></div>
+              <div style={{textAlign:'right'}}><div style={{fontFamily:'var(--ff-mono)',fontSize:11,color:'var(--txt3)'}}>{s.time}</div><span className={`bdg ${s.status==='present'?'bg':'br'}`} style={{fontSize:9}}>{s.status==='present'?'Présent':'Absent'}</span></div>
             </div>
           ))}
-          {scans.length===0&&<div className="empty"><div className="ei">📡</div><div className="et">Aucun scan reçu pour aujourd'hui</div></div>}
         </div>
       </div>
     </div>
@@ -1243,7 +1139,7 @@ function SoumettreJustif(){
   try {
     const fd = new FormData();
     fd.append('message', form.reason);
-    fd.append('absence_id', form.absence);
+    fd.append('absence_id', form.absence); // added absence_id
     if (form.file) fd.append('file', form.file);
     await axios.post(`/my-justifications`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' }
@@ -1293,85 +1189,64 @@ function SoumettreJustif(){
 }
 
 function AbsencesAdmin(){
-  const[classFilter,setClassFilter]=useState('3IIR-A');
-  const[list,setList]=useState([]);
-
-  useEffect(()=>{
-    axios.get('/attendance', { params: { class: classFilter } })
-      .then(r => setList(r.data.data || []))
-      .catch(() => {});
-  }, [classFilter]);
-
   return(
     <div className="pg-anim">
       <div className="topbar">
-        <select className="fsel" value={classFilter} onChange={e=>setClassFilter(e.target.value)} style={{width:'auto',padding:'7px 12px',fontSize:12.5}}>{CLASS_OPTIONS.map(f=><option key={f}>{f}</option>)}</select>
+        <select className="fsel" style={{width:'auto',padding:'7px 12px',fontSize:12.5}}>{['3IIR-A','3IIR-B','2IIR-A','2IIR-B'].map(f=><option key={f}>{f}</option>)}</select>
+        <button className="btn b-ghost b-sm">📥 Export CSV</button>
       </div>
       <div className="card">
         <table className="dt">
-          <thead><tr><th>Étudiant</th><th>Date</th><th>Heure</th><th>Filière</th><th>Statut</th></tr></thead>
+          <thead><tr><th>Étudiant</th><th>Date</th><th>Matière</th><th>Durée</th><th>Justifié</th><th>Statut</th></tr></thead>
           <tbody>
-            {list.map(a=>(
+            {ABSENCES_STU.map(a=>(
               <tr key={a.id}>
-                <td style={{fontWeight:600}}>{a.student?.name}</td>
+                <td style={{fontWeight:600}}>Ayoub Mansouri</td>
                 <td style={{fontFamily:'var(--ff-mono)',fontSize:11.5,color:'var(--txt3)'}}>{a.date}</td>
-                <td style={{fontFamily:'var(--ff-mono)',fontSize:11.5}}>{a.time}</td>
-                <td><span className="chip">{a.student?.class}</span></td>
-                <td><span className={`bdg ${STATUS_BADGES[a.status] || 'ba'}`}>{STATUS_LABELS[a.status] || a.status}</span></td>
+                <td style={{fontWeight:500}}>{a.matiere}</td>
+                <td style={{fontFamily:'var(--ff-mono)',fontSize:11.5}}>{a.duree}</td>
+                <td><span className={`bdg ${a.justifie?'bg':'br'}`}>{a.justifie?'Oui':'Non'}</span></td>
+                <td><span className={`bdg ${a.statut==='Validé'?'bg':a.statut==='En attente'?'ba':'br'}`}>{a.statut}</span></td>
               </tr>
             ))}
           </tbody>
         </table>
-        {list.length===0&&<div className="empty"><div className="ei">📅</div><div className="et">Aucune présence trouvée pour cette filière</div></div>}
       </div>
     </div>
   );
 }
 
 function MesAbsences(){
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    axios.get('/my-profile')
-      .then(r => setData(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <div className="pg-anim"><div className="empty">Chargement...</div></div>;
-  if (!data) return <div className="pg-anim"><div className="empty">Erreur de chargement des données.</div></div>;
-
-  const absences = data.attendances?.filter(a => a.status === 'absent') || [];
-
   return(
     <div className="pg-anim">
       <div className="card">
         <div className="sh"><div className="st">Historique de mes absences</div></div>
         <table className="dt">
-          <thead><tr><th>Date</th><th>Heure</th><th>Statut</th></tr></thead>
+          <thead><tr><th>Date</th><th>Matière</th><th>Professeur</th><th>Durée</th><th>Justifié</th><th>Statut</th></tr></thead>
           <tbody>
-            {absences.map(a=>(
+            {ABSENCES_STU.map(a=>(
               <tr key={a.id}>
                 <td style={{fontFamily:'var(--ff-mono)',fontSize:11.5,color:'var(--txt3)'}}>{a.date}</td>
-                <td style={{fontWeight:600}}>{a.time}</td>
-                <td><span className="bdg br">Absent</span></td>
+                <td style={{fontWeight:600}}>{a.matiere}</td>
+                <td style={{color:'var(--txt3)',fontSize:12.5}}>{a.prof}</td>
+                <td style={{fontFamily:'var(--ff-mono)',fontSize:11.5}}>{a.duree}</td>
+                <td><span className={`bdg ${a.justifie?'bg':'br'}`}>{a.justifie?'Oui':'Non'}</span></td>
+                <td><span className={`bdg ${a.statut==='Validé'?'bg':a.statut==='En attente'?'ba':'br'}`}>{a.statut}</span></td>
               </tr>
             ))}
           </tbody>
         </table>
-        {absences.length === 0 && <div className="empty">Aucune absence trouvée.</div>}
       </div>
     </div>
   );
 }
 
 function App(){
-  const[user,setUser]=useState(()=>getStoredUser());
+  const[user,setUser]=useState(()=>{try{return JSON.parse(localStorage.getItem('sng_user'));}catch{return null;}});
   const[page,setPage]=useState('dashboard');
   const[mini,setMini]=useState(false);
-  const handleLogin=u=>{storeSession(u);setUser(u);setPage('dashboard');};
-  const handleLogout=async()=>{try{await axios.post('/auth/logout');}catch(_){ }clearStoredSession();setUser(null);};
+  const handleLogin=u=>{localStorage.setItem('sng_user',JSON.stringify(u));localStorage.setItem('sng_token',u.token);setUser(u);setPage('dashboard');};
+  const handleLogout=()=>{localStorage.removeItem('sng_user');localStorage.removeItem('sng_token');setUser(null);};
   const PAGE_TITLES={
     dashboard:user?.role==='student'?'Mon dashboard':'Vue d\'ensemble',
     students:'Gestion des étudiants',
@@ -1444,6 +1319,5 @@ function App(){
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
-@endverbatim
 </body>
 </html>

@@ -11,6 +11,7 @@ class Justification extends Model
 
     protected $fillable = [
         'student_id',
+        'attendance_id',
         'type',
         'message',
         'file_path',
@@ -20,5 +21,10 @@ class Justification extends Model
     public function student()
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function attendance()
+    {
+        return $this->belongsTo(Attendance::class);
     }
 }
