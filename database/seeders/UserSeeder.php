@@ -8,25 +8,28 @@ use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
+
+
     public function run(): void
     {
+        User::truncate();
         User::create([
             'name'     => 'Admin User',
-            'email'    => 'admin@scanngo.com',
+            'email'    => 'admin@ensam-casa.ma',
             'password' => Hash::make('password'),
             'role'     => 'admin',
         ]);
 
         User::create([
             'name'     => 'Professor Hassan',
-            'email'    => 'prof@scanngo.com',
+            'email'    => 'prof@ensam-casa.ma',
             'password' => Hash::make('password'),
             'role'     => 'professor',
         ]);
         User::create([
-            'name' => 'Faty',
-            'email' => 'student@test.com',
-            'password' => bcrypt('password'),
+            'name' => 'Youssef Alami',
+            'email' => 'student@ensam-casa.ma',
+            'password' => Hash::make('password'),
             'role' => 'student',
         ]);
     }
