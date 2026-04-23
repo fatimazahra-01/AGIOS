@@ -399,6 +399,12 @@ axios.interceptors.response.use(
     return Promise.reject(err);
   }
 );  
+
+const normalizeJustification = item => ({
+  ...item,
+  file_name: item.file_path ? item.file_path.split('/').pop() : 'Aucun fichier',
+  preview_url: item.file_path ? `/justifications/${item.id}/file` : null,
+});
 const{useState,useEffect,useRef,useCallback}=React;
 const api=axios.create({baseURL:'/api',timeout:10000});
 api.interceptors.request.use(cfg=>{const t=localStorage.getItem('sng_token');if(t)cfg.headers.Authorization=`Bearer ${t}`;return cfg;});
@@ -578,7 +584,16 @@ function Sidebar({user,page,setPage,onLogout,mini,setMini}){
   );
 }
 
-const handleAISubmit=async(query)=>{return null;};
+const handleAISubmit=async(query)=>{
+  try {
+    const res = await axios.post('/ai/query', { query });
+    return res.data.answer;
+  } catch(e) {
+    console.error('Erreur IA:', e);
+    const errorMsg = e.response?.data?.error || 'Erreur assistant IA';
+    return `⚠️ **Erreur** : ${errorMsg}`;
+  }
+};
 
 function Chatbot(){
   const[open,setOpen]=useState(false);
@@ -804,7 +819,7 @@ function JustificatifsAdmin(){
 
   useEffect(() => {
     axios.get('/justifications')
-      .then(r => setList(r.data))
+      .then(r => setList((r.data || []).map(normalizeJustification)))
       .catch(() => {});
   }, []);
 
@@ -815,7 +830,22 @@ function JustificatifsAdmin(){
     setList(p => p.map(j => j.id === id
       ? {...j, status: ok ? 'approved' : 'rejected'}
       : j
-    ));  };
+    ));
+  };
+
+  const openJustificationFile = async justification => {
+    if (!justification?.preview_url) return;
+
+    try {
+      const response = await axios.get(justification.preview_url, {
+        responseType: 'blob',
+      });
+      const blobUrl = window.URL.createObjectURL(response.data);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    } catch (_) {
+      alert('Impossible d\'ouvrir le fichier.');
+    }
+  };
   return(
     <div className="pg-anim" style={{display:'flex',flexDirection:'column',gap:14}}>
       {list.map(j=>(
@@ -829,23 +859,23 @@ function JustificatifsAdmin(){
           </div>
           <div className="jcard-bd">
             <div className="jprev" onClick={()=>setPrev(j)}>
-              <div style={{textAlign:'center'}}><div style={{fontSize:32,marginBottom:6}}>{j.emoji}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:11,color:'var(--txt3)'}}>{j.fichier}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:9,color:'var(--indigo)',marginTop:4,letterSpacing:'0.05em'}}>CLIQUER POUR PRÉVISUALISER</div></div>
+              <div style={{textAlign:'center'}}><div style={{fontSize:32,marginBottom:6}}>{j.preview_url?'📄':'📝'}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:11,color:'var(--txt3)'}}>{j.file_name}</div><div style={{fontFamily:'var(--ff-mono)',fontSize:9,color:'var(--indigo)',marginTop:4,letterSpacing:'0.05em'}}>CLIQUER POUR PRÉVISUALISER</div></div>
             </div>
-            {j.statut==='pending'&&<div style={{display:'flex',gap:8}}><button className="btn b-cyan" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,true)}><I n="chk" s={13}/>Valider</button><button className="btn b-danger" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,false)}><I n="x" s={13}/>Refuser</button></div>}
+            {j.status==='pending'&&<div style={{display:'flex',gap:8}}><button className="btn b-cyan" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,true)}><I n="chk" s={13}/>Valider</button><button className="btn b-danger" style={{flex:1,justifyContent:'center'}} onClick={()=>validate(j.id,false)}><I n="x" s={13}/>Refuser</button></div>}
           </div>
         </div>
       ))}
       {prev&&(
         <div className="mo" onClick={()=>setPrev(null)}>
           <div className="mo-box" style={{maxWidth:460}}>
-            <div className="mo-title">Prévisualisation — {prev.fichier}</div>
+            <div className="mo-title">Prévisualisation — {prev.file_name}</div>
             <button className="mo-close" onClick={()=>setPrev(null)}>×</button>
             <div style={{background:'var(--bg3)',borderRadius:12,padding:36,textAlign:'center',marginBottom:14,border:'1px solid var(--border4)'}}>
-              <div style={{fontSize:60,marginBottom:10}}>{prev.emoji}</div>
-              <div style={{fontFamily:'var(--ff-mono)',fontSize:12,color:'var(--txt2)',marginBottom:4}}>{prev.fichier}</div>
-              <div style={{fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--txt3)'}}>Motif : {prev.motif} · {prev.student} · {prev.date}</div>
+              <div style={{fontSize:60,marginBottom:10}}>{prev.preview_url?'📄':'📝'}</div>
+              <div style={{fontFamily:'var(--ff-mono)',fontSize:12,color:'var(--txt2)',marginBottom:4}}>{prev.file_name}</div>
+              <div style={{fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--txt3)'}}>Message : {prev.message} · {prev.student?.name || 'Étudiant inconnu'}</div>
             </div>
-            <div style={{background:'var(--amber2)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:9,padding:'9px 13px',fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--amber)',letterSpacing:'0.04em'}}>⚠ Aperçu simulé — fichier réel servi par Laravel Storage</div>
+            {prev.preview_url?<button className="btn b-indigo" onClick={()=>openJustificationFile(prev)}>Ouvrir le fichier</button>:<div style={{background:'var(--amber2)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:9,padding:'9px 13px',fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--amber)',letterSpacing:'0.04em'}}>Aucun fichier joint pour ce justificatif</div>}
           </div>
         </div>
       )}

@@ -7,9 +7,11 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
+        "google-gemini-php/laravel": "^2.0",
         "laravel/framework": "^13.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^3.0",
+        "openai-php/laravel": "^0.19.1",
         "php-open-source-saver/jwt-auth": "^2.9"
     },
     "require-dev": {

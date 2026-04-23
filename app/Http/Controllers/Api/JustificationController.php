@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Models\Justification;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class JustificationController extends Controller
 {
@@ -86,6 +87,27 @@ class JustificationController extends Controller
         return response()->json([
             'message'       => 'Justification updated',
             'justification' => $justification,
+        ]);
+    }
+
+    public function showFile(Justification $justification)
+    {
+        if (!$justification->file_path) {
+            return response()->json(['message' => 'No file attached to this justification.'], 404);
+        }
+
+        $disk = Storage::disk('public');
+
+        if (!$disk->exists($justification->file_path)) {
+            return response()->json(['message' => 'File not found.'], 404);
+        }
+
+        $fullPath = $disk->path($justification->file_path);
+        $mimeType = $disk->mimeType($justification->file_path) ?: 'application/octet-stream';
+
+        return response()->file($fullPath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="'.basename($justification->file_path).'"',
         ]);
     }
 }

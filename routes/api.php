@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AIController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\ConfigController;
@@ -33,8 +34,10 @@ Route::middleware('auth:api')->group(function () {
         Route::get('students/{student}',       [StudentController::class, 'show']);
         Route::get('students/{student}/attendance', [AttendanceController::class, 'studentHistory']);
         Route::get('justifications',           [JustificationController::class, 'index']);
+        Route::get('justifications/{justification}/file', [JustificationController::class, 'showFile']);
         Route::patch('justifications/{justification}/status', [JustificationController::class, 'updateStatus']);
         Route::get('analytics/summary', [AttendanceController::class, 'summary']);
+        Route::post('ai/query',          [AIController::class, 'query']);
     });
 
     // 🔒 ACCÈS RÉSERVÉ : ÉTUDIANT UNIQUEMENT (pour soumettre ses propres justifications)

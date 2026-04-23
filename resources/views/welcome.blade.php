@@ -445,7 +445,7 @@ const summarizeStudent = student => {
 const normalizeJustification = item => ({
   ...item,
   file_name: item.file_path ? item.file_path.split('/').pop() : 'Aucun fichier',
-  preview_url: item.file_path ? `${window.location.origin}/storage/${item.file_path}` : null,
+  preview_url: item.file_path ? `/justifications/${item.id}/file` : null,
 });
 
 const formatDateTime = value => {
@@ -631,7 +631,16 @@ function Sidebar({user,page,setPage,onLogout,mini,setMini}){
   );
 }
 
-const handleAISubmit=async(query)=>{return null;};
+const handleAISubmit=async(query)=>{
+  try {
+    const res = await axios.post('/ai/query', { query });
+    return res.data.answer;
+  } catch(e) {
+    console.error('Erreur IA:', e);
+    const errorMsg = e.response?.data?.error || 'Erreur de connexion à l\'assistant.';
+    return `⚠️ **Erreur** : ${errorMsg}`;
+  }
+};
 
 function Chatbot(){
   const[open,setOpen]=useState(false);
@@ -896,6 +905,20 @@ function JustificatifsAdmin(){
       alert(formatApiError(e));
     }
   };
+
+  const openJustificationFile = async justification => {
+    if (!justification?.preview_url) return;
+
+    try {
+      const response = await axios.get(justification.preview_url, {
+        responseType: 'blob',
+      });
+      const blobUrl = window.URL.createObjectURL(response.data);
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      alert(formatApiError(e));
+    }
+  };
   return(
     <div className="pg-anim" style={{display:'flex',flexDirection:'column',gap:14}}>
       {list.length===0&&<div className="empty"><div className="ei">📂</div><div className="et">Aucun justificatif disponible</div></div>}
@@ -926,7 +949,7 @@ function JustificatifsAdmin(){
               <div style={{fontFamily:'var(--ff-mono)',fontSize:12,color:'var(--txt2)',marginBottom:4}}>{prev.file_name}</div>
               <div style={{fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--txt3)'}}>Message : {prev.message} · {prev.student?.name || 'Étudiant inconnu'} · {formatDateTime(prev.created_at)}</div>
             </div>
-            {prev.preview_url?<a className="btn b-indigo" href={prev.preview_url} target="_blank" rel="noreferrer">Ouvrir le fichier</a>:<div style={{background:'var(--amber2)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:9,padding:'9px 13px',fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--amber)',letterSpacing:'0.04em'}}>Aucun fichier joint pour ce justificatif</div>}
+            {prev.preview_url?<button className="btn b-indigo" onClick={()=>openJustificationFile(prev)}>Ouvrir le fichier</button>:<div style={{background:'var(--amber2)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:9,padding:'9px 13px',fontFamily:'var(--ff-mono)',fontSize:10,color:'var(--amber)',letterSpacing:'0.04em'}}>Aucun fichier joint pour ce justificatif</div>}
           </div>
         </div>
       )}
